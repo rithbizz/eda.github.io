@@ -1,0 +1,281 @@
+/*-- scss:defaults --*/
+$primary:             #4f46e5;
+$secondary:           #7c3aed;
+$body-bg:             #f8fafc;
+$body-color:          #1e293b;
+$link-color:          #4f46e5;
+$headings-color:      #0f172a;
+$border-color:        #e2e8f0;
+$font-family-base:    "Inter", "Segoe UI", system-ui, sans-serif;
+$font-family-monospace: "Fira Code", "Cascadia Code", monospace;
+$code-bg:             #f1f5f9;
+$code-color:          #4f46e5;
+
+/*-- scss:rules --*/
+
+/* ── Import fonts ── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+
+/* ── Base ── */
+body {
+  background-color: $body-bg;
+  color: $body-color;
+}
+
+/* ── Navbar ── */
+.navbar {
+  background: #ffffff !important;
+  border-bottom: 2px solid #e2e8f0;
+  box-shadow: 0 1px 12px rgba(79, 70, 229, 0.08);
+}
+
+.navbar-brand {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #0f172a !important;
+  letter-spacing: 0.02em;
+}
+
+.navbar .nav-link {
+  color: #475569 !important;
+  font-weight: 500;
+  transition: color 0.2s ease;
+
+  &:hover, &.active {
+    color: #4f46e5 !important;
+  }
+}
+
+/* ── Hero banner ── */
+.hero-banner {
+  background: linear-gradient(135deg, #eef2ff 0%, #f0fdf4 50%, #fafafa 100%);
+  border: 1px solid #c7d2fe;
+  border-radius: 16px;
+  padding: 3rem 2.5rem;
+  margin-bottom: 2.5rem;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: -60px;
+    right: -60px;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, #c7d2fe66 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  h1 {
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 0.6rem;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed, #059669);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  p.lead {
+    font-size: 1.1rem;
+    color: #475569;
+    max-width: 680px;
+  }
+}
+
+/* ── Stat cards ── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.stat-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem 1rem;
+  text-align: center;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.12);
+    border-color: #a5b4fc;
+  }
+
+  .stat-number {
+    font-size: 1.9rem;
+    font-weight: 700;
+    color: #4f46e5;
+    line-height: 1.1;
+    display: block;
+  }
+
+  .stat-label {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 0.3rem;
+    display: block;
+  }
+}
+
+/* ── Insight callout boxes ── */
+.insight-box {
+  background: #eef2ff;
+  border-left: 4px solid #4f46e5;
+  border-radius: 0 10px 10px 0;
+  padding: 0.9rem 1.25rem;
+  margin: 1.2rem 0;
+  font-size: 0.95rem;
+  color: #334155;
+
+  strong {
+    color: #4f46e5;
+  }
+}
+
+/* ── Tables ── */
+.dataframe, table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.88rem;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+
+  thead tr {
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color: #ffffff;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+
+    th {
+      padding: 0.75rem 1rem;
+      border: none;
+    }
+  }
+
+  tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.15s;
+
+    &:hover {
+      background: #f8faff;
+    }
+
+    td {
+      padding: 0.6rem 1rem;
+      border: none;
+      color: #334155;
+    }
+  }
+}
+
+/* ── Code blocks ── */
+pre, code {
+  background: #f1f5f9 !important;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #334155 !important;
+}
+
+.sourceCode {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0;
+}
+
+/* ── Headings ── */
+h1, h2, h3, h4 {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+h2 {
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 0.4rem;
+  margin-top: 2.5rem;
+}
+
+h3 {
+  color: #1e293b;
+  margin-top: 1.8rem;
+}
+
+/* ── TOC ── */
+#toc-title {
+  color: #4f46e5;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.sidebar nav[role="doc-toc"] a {
+  color: #64748b;
+  font-size: 0.88rem;
+  transition: color 0.2s;
+
+  &:hover, &.active {
+    color: #4f46e5;
+  }
+}
+
+/* ── Footer ── */
+.page-footer {
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #94a3b8;
+  font-size: 0.84rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+/* ── Figures ── */
+.quarto-figure {
+  margin: 1.5rem auto;
+}
+
+/* ── Code fold button ── */
+.code-fold-btn {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #4f46e5;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+
+  &:hover {
+    background: #e0e7ff;
+  }
+}
+
+/* ── Badges ── */
+.badge-win  { display:inline-block; padding:.2em .65em; border-radius:20px;
+              background:#dcfce7; color:#16a34a; font-size:.75rem; font-weight:600; }
+.badge-lose { display:inline-block; padding:.2em .65em; border-radius:20px;
+              background:#fee2e2; color:#dc2626; font-size:.75rem; font-weight:600; }
+
+/* ── Horizontal rule ── */
+hr {
+  border-color: #e2e8f0;
+  opacity: 1;
+}
+
+/* ── Blockquote / callout fallback ── */
+blockquote {
+  border-left: 4px solid #a5b4fc;
+  background: #f8faff;
+  color: #334155;
+  padding: 0.75rem 1rem;
+  border-radius: 0 8px 8px 0;
+}

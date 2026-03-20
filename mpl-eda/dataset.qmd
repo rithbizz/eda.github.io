@@ -1,0 +1,233 @@
+---
+title: "Dataset Description"
+subtitle: "Understanding what the data contains, how it is structured, and where it came from"
+---
+
+```{python}
+#| echo: false
+import sys, pathlib
+sys.path.insert(0, str(pathlib.Path(".").resolve()))
+import utils
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+df = utils.load_data()
+utils.apply_dark_theme()
+```
+
+## Source & Context
+
+The dataset covers **Mobile Legends Professional League Cambodia — Season 6 (MPL Cambodia S6)**, the country's highest tier of competitive MLBB. All data was recorded from official match records and captures the full bracket from the Regular Season through the Grand Final.
+
+The raw data is distributed across five CSV files:
+
+| File | Contents |
+|---|---|
+| `MPL Cambodia Season 6 - BoxMatch.csv` | **Primary dataset** — one row per player per game |
+| `MPL Cambodia Season 6 - Hero and Role.csv` | Hero metadata — stats, roles, abilities |
+| `MPL Cambodia Season 6 Item_Stats.csv` | Item catalogue with attributes |
+| `MPL Cambodia Season 6 Jungle And Roam.csv` | Jungle/roam spell descriptions |
+| `MPL Cambodia Season 6 Spell Battle.csv` | Battle spell descriptions |
+
+This analysis focuses primarily on **BoxMatch**, the match-level performance log.
+
+---
+
+## Data Shape
+
+```{python}
+#| label: data-shape
+print(f"Rows    : {df.shape[0]:,}")
+print(f"Columns : {df.shape[1]}")
+print(f"Matches : {df['Match'].nunique()}")
+print(f"Teams   : {df['team_clean'].nunique()}")
+print(f"Players : {df['Players'].nunique()}")
+print(f"Date range: {df['Date'].min().date()} → {df['Date'].max().date()}")
+```
+
+::: {.insight-box}
+**Structure note:** Because each team fields 5 players, every **game** produces exactly **10 player rows** (5 per side). A "match" in the dataset corresponds to one game — meaning 1,010 rows = 101 individual games.
+:::
+
+---
+
+## Column Reference
+
+```{python}
+#| label: tbl-columns
+schema = pd.DataFrame([
+    ("Date",       "object/date", "Match date (DD/MM/YYYY)"),
+    ("Stage",      "object",      "Tournament stage (Regular Season, Playoffs, etc.)"),
+    ("Match",      "int",         "Match ID (1–6, reused per stage)"),
+    ("Team",       "object",      "Team name (raw, may contain whitespace)"),
+    ("Players",    "object",      "Player in-game name"),
+    ("Pick",       "object",      "Hero picked by the player"),
+    ("Role Pick",  "object",      "Role played (e.g. Fighter, Tank, Support)"),
+    ("Ban",        "object",      "Hero banned by the team during draft"),
+    ("Role Ban",   "object",      "Role of the banned hero"),
+    ("Spell",      "object",      "Battle spell selected"),
+    ("Emblem",     "object",      "Emblem category used"),
+    ("Talent 1–3", "object",      "Three talent nodes selected within the emblem"),
+    ("Time",       "object",      "Match duration in MM:SS format"),
+    ("MVP",        "int",         "1 if player was awarded MVP, else 0"),
+    ("K",          "int",         "Kills"),
+    ("D",          "int",         "Deaths"),
+    ("A",          "int",         "Assists"),
+    ("Gold",       "int",         "Gold earned in the match"),
+    ("Level",      "int",         "Hero level at match end"),
+    ("Win",        "object",      "Outcome — 'Win' or 'Lose'"),
+    ("Tower",      "int",         "Towers destroyed by the team"),
+    ("Lord",       "int",         "Lord objectives secured"),
+    ("Turtle",     "int",         "Turtle objectives secured"),
+    ("Blue Buff",  "float",       "Blue buff captures (team-level)"),
+    ("Red Buff",   "float",       "Red buff captures (team-level)"),
+    ("dur_sec",    "float",       "[Derived] Duration in seconds"),
+    ("dur_min",    "float",       "[Derived] Duration in minutes"),
+    ("kda",        "float",       "[Derived] (K + A) / max(D, 1)"),
+    ("role",       "object",      "[Derived] Simplified primary role"),
+    ("team_clean", "object",      "[Derived] Stripped team name"),
+    ("win_bool",   "bool",        "[Derived] Boolean win flag"),
+], columns=["Column", "Type", "Description"])
+
+schema.style\
+    .set_properties(**{"text-align": "left"})\
+    .hide(axis="index")
+```
+
+---
+
+## Sample Rows
+
+```{python}
+#| label: tbl-sample
+(
+    df[["Date", "Stage", "team_clean", "Players", "Pick", "role",
+        "K", "D", "A", "Gold", "dur_min", "Win", "kda"]]
+    .head(10)
+    .round({"dur_min": 1, "kda": 2})
+    .reset_index(drop=True)
+    .style
+    .set_properties(**{"text-align": "left"})
+)
+```
+
+---
+
+## Data Quality
+
+### Missing Values
+
+```{python}
+#| label: fig-missing
+#| fig-cap: "Count of missing values per column in the raw BoxMatch dataset."
+
+raw = pd.read_csv("../Data/MPL Cambodia Season 6 - BoxMatch.csv")
+raw.columns = raw.columns.str.strip().str.replace(r"\s+", " ", regex=True)
+
+missing = raw.isnull().sum()
+missing = missing[missing > 0].sort_values(ascending=False)
+
+if len(missing) == 0:
+    print("✅  No missing values found in the dataset.")
+else:
+    fig, ax = plt.subplots(figsize=(8, max(3, len(missing) * 0.5)))
+    ax.barh(missing.index[::-1], missing.values[::-1],
+            color=utils.PALETTE["warning"], edgecolor="none")
+    for i, (col, cnt) in enumerate(zip(missing.index[::-1], missing.values[::-1])):
+        ax.text(cnt + 0.3, i, str(cnt), va="center",
+                fontsize=9, color=utils.PALETTE["text"])
+    ax.set_xlabel("Missing count")
+    ax.set_title("Missing Values by Column", pad=12)
+    fig.tight_layout()
+    plt.show()
+```
+
+```{python}
+#| label: tbl-missing
+missing_df = (
+    raw.isnull().sum()
+       .reset_index()
+)
+missing_df.columns = ["Column", "Missing"]
+missing_df["% Missing"] = (missing_df["Missing"] / len(raw) * 100).round(2)
+missing_df = missing_df[missing_df["Missing"] > 0].sort_values("Missing", ascending=False)
+
+if len(missing_df) == 0:
+    print("All columns are complete — no missing values.")
+else:
+    missing_df.style.hide(axis="index")
+```
+
+::: {.insight-box}
+**Quality verdict:** Only a handful of rows have missing values in `Emblem`, `Talent 1`, `Talent 2`, and the Buff columns — likely caused by data entry gaps in the source records. All missing objective values (Blue/Red Buff) are imputed with **0** during loading, which is a safe assumption since a blank value indicates nothing was recorded.
+:::
+
+---
+
+### Data Types After Cleaning
+
+```{python}
+#| label: tbl-dtypes
+dtype_df = df.dtypes.reset_index()
+dtype_df.columns = ["Column", "dtype"]
+dtype_df["dtype"] = dtype_df["dtype"].astype(str)
+dtype_df.style.hide(axis="index")
+```
+
+---
+
+## Distribution Overview — Quick Glance
+
+```{python}
+#| label: fig-overview-hist
+#| fig-cap: "Histograms of the five core numeric performance columns."
+
+cols = ["K", "D", "A", "Gold", "dur_min"]
+labels = ["Kills", "Deaths", "Assists", "Gold Earned", "Duration (min)"]
+colors = [
+    utils.PALETTE["danger"],
+    utils.PALETTE["warning"],
+    utils.PALETTE["success"],
+    utils.PALETTE["accent"],
+    utils.PALETTE["secondary"],
+]
+
+fig, axes = plt.subplots(1, 5, figsize=(16, 4))
+for ax, col, label, color in zip(axes, cols, labels, colors):
+    ax.hist(
+        df[col].dropna(), bins=20,
+        color=color, edgecolor="none", alpha=0.85,
+    )
+    ax.set_title(label, fontsize=11)
+    ax.set_xlabel(label, fontsize=9)
+    ax.set_ylabel("Count" if ax == axes[0] else "", fontsize=9)
+
+fig.suptitle("Distribution Snapshot — Core Performance Metrics", y=1.03, fontsize=13)
+fig.tight_layout()
+plt.show()
+```
+
+::: {.insight-box}
+**At a glance:** Kills and Deaths are right-skewed — most players record low counts while a few star performers pull ahead. Gold is relatively bell-shaped. Duration clusters around 20–30 minutes, suggesting brisk mid-game pacing typical of high-level MPL play.
+:::
+
+---
+
+## Unique Values — Categorical Columns
+
+```{python}
+#| label: tbl-categoricals
+cat_cols = ["Stage", "team_clean", "role", "Spell", "Emblem", "Win"]
+cat_summary = pd.DataFrame([
+    {
+        "Column": c,
+        "Unique Values": df[c].nunique(),
+        "Top Value": df[c].mode()[0],
+        "Top Frequency": df[c].value_counts().iloc[0],
+    }
+    for c in cat_cols
+])
+cat_summary.style.hide(axis="index")
+```

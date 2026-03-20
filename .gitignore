@@ -1,0 +1,22 @@
+# Quarto build output & temp files — never commit
+mpl-eda/_site/
+mpl-eda/.quarto/
+mpl-eda/__pycache__/
+mpl-eda/*.quarto_ipynb
+mpl-eda/*_internal_scss_error.scss
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+.venv/
+*.egg-info/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp

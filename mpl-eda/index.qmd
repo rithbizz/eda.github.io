@@ -1,0 +1,179 @@
+---
+title: "MPL Cambodia Season 6 — EDA"
+subtitle: "A data-driven exploration of Southeast Asia's fastest-growing esports league"
+page-layout: full
+toc: false
+---
+
+```{python}
+#| echo: false
+import sys, pathlib
+sys.path.insert(0, str(pathlib.Path(".").resolve()))
+import utils, pandas as pd, numpy as np
+
+df  = utils.load_data()
+ml  = utils.match_level(df)
+```
+
+::: {.hero-banner}
+
+# 🎮 MPL Cambodia Season 6
+
+**Mobile Legends Professional League Cambodia** — Season 6 is the premier competitive circuit for Mobile Legends: Bang Bang in Cambodia. Eight elite teams clashed across a full regular season and playoffs bracket to claim the national championship title and earn the right to represent Cambodia on the international stage.
+
+This project performs a **complete Exploratory Data Analysis** of every match, every pick, every kill, and every gold coin earned across the tournament — translating raw game logs into clear, visual stories.
+
+:::
+
+---
+
+## At a Glance
+
+```{python}
+#| echo: false
+n_players   = df["Players"].nunique()
+n_teams     = df["team_clean"].nunique()
+n_matches   = df["Match"].nunique()
+n_games     = df.groupby(["Match", "team_clean"]).ngroups // 2
+avg_dur     = df.groupby(["Match", "team_clean"])["dur_min"].first().mean()
+total_kills = df["K"].sum()
+total_gold  = df["Gold"].sum()
+top_mvp     = df.groupby("Players")["MVP"].sum().idxmax()
+
+print(f"""
+Teams      : {n_teams}
+Players    : {n_players}
+Matches    : {n_matches}
+Avg. Duration : {avg_dur:.1f} min
+Total Kills : {total_kills:,}
+Total Gold  : {total_gold:,}
+Top MVP     : {top_mvp}
+""")
+```
+
+::: {.stat-grid}
+
+::: {.stat-card}
+[8]{.stat-number}
+[Teams]{.stat-label}
+:::
+
+::: {.stat-card}
+[202]{.stat-number}
+[Players Tracked]{.stat-label}
+:::
+
+::: {.stat-card}
+[6]{.stat-number}
+[Unique Matches]{.stat-label}
+:::
+
+::: {.stat-card}
+[1,010]{.stat-number}
+[Player-Game Rows]{.stat-label}
+:::
+
+::: {.stat-card}
+[~24 min]{.stat-number}
+[Avg. Match Duration]{.stat-label}
+:::
+
+::: {.stat-card}
+[8 Stages]{.stat-number}
+[Tournament Phases]{.stat-label}
+:::
+
+:::
+
+---
+
+## What This Dataset Contains
+
+The dataset is a **player-game-level** breakdown of every competitive match played in MPL Cambodia Season 6. Each row represents one player's performance in one game, giving us:
+
+| Category | What's Captured |
+|---|---|
+| **Match metadata** | Date, stage, match ID, winning team |
+| **Draft phase** | Hero picks, bans, role assignments |
+| **Performance stats** | Kills, Deaths, Assists, Gold earned, Level |
+| **Objectives** | Towers destroyed, Lord / Turtle / Buff captures |
+| **Configuration** | Battle spells, emblems, and talent selections |
+
+Because five players appear per team per game, every row is linked to exactly one match-team-game combination. This structure enables both **per-player analysis** and **per-team aggregations**.
+
+---
+
+## Tournament Structure
+
+```{python}
+#| label: fig-stage-bar
+#| fig-cap: "Number of player-rows recorded per tournament stage (each game has 10 player rows)."
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+utils.apply_dark_theme()
+
+stage_order = [
+    "Regular Season",
+    "Upper Bracket Quarterfinals",
+    "Upper Bracket Semifinals",
+    "Upper Bracket Final",
+    "Lower Bracket Semifinal",
+    "Lower Bracket Final",
+    "5th place match",
+    "Grand Final",
+]
+stage_counts = (
+    df["Stage"]
+    .value_counts()
+    .reindex([s for s in stage_order if s in df["Stage"].unique()])
+    .reset_index()
+)
+stage_counts.columns = ["Stage", "Count"]
+
+fig, ax = plt.subplots(figsize=(10, 4))
+bars = ax.barh(
+    stage_counts["Stage"][::-1],
+    stage_counts["Count"][::-1],
+    color=utils.PALETTE["primary"],
+    edgecolor="none",
+    height=0.6,
+)
+# Value labels
+for bar in bars:
+    w = bar.get_width()
+    ax.text(
+        w + 2, bar.get_y() + bar.get_height() / 2,
+        f"{int(w):,}",
+        va="center", ha="left",
+        fontsize=9, color=utils.PALETTE["text"],
+    )
+ax.set_xlabel("Player-row count")
+ax.set_title("Dataset Coverage by Tournament Stage", pad=12)
+ax.set_xlim(0, stage_counts["Count"].max() * 1.15)
+fig.tight_layout()
+plt.show()
+```
+
+::: {.insight-box}
+**Reading the chart:** The Regular Season dominates row count because it spans the most games.
+Playoff stages have fewer rows but typically contain the highest-intensity, longest matches with the most experienced rosters.
+:::
+
+---
+
+## Analysis Roadmap
+
+Navigate through the pages to follow the full EDA story:
+
+| Page | Focus |
+|---|---|
+| [**Teams & Rosters**](teams.qmd) | Full team introductions, player roles, KDA, signature heroes |
+| [**Dataset**](dataset.qmd) | Column definitions, data types, quality checks |
+| [**Univariate**](univariate.qmd) | Distributions of match duration, kills, gold, and more |
+| [**Bivariate**](bivariate.qmd) | Relationships between kills, gold, roles, and objectives |
+| [**Insights**](insights.qmd) | Team standings, top players, MVP leaderboard |
+
+---
+
+*Data sourced from publicly available MPL Cambodia Season 6 match records.*

@@ -1,0 +1,505 @@
+---
+title: "Univariate Analysis"
+subtitle: "Exploring the shape and spread of individual variables — one at a time"
+---
+
+```{python}
+#| echo: false
+import sys, pathlib
+sys.path.insert(0, str(pathlib.Path(".").resolve()))
+import utils
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+import seaborn as sns
+from scipy import stats
+
+df = utils.load_data()
+utils.apply_dark_theme()
+```
+
+Univariate analysis examines **one variable at a time**, giving us a clear picture of its central tendency, spread, and shape before we consider relationships with other variables. For each key metric we report:
+
+- **Mean** — the arithmetic average, sensitive to outliers
+- **Median** — the middle value, robust to extremes
+- **Mode** — the most common value
+- **Std Dev / IQR** — two complementary measures of spread
+
+---
+
+## Match Duration
+
+### Summary Statistics
+
+```{python}
+#| label: tbl-dur-stats
+
+dur = df.groupby(["Match", "team_clean"])["dur_min"].first().drop_duplicates()
+
+stats_dur = pd.DataFrame({
+    "Metric": ["Mean", "Median", "Mode", "Std Dev", "Min", "Max",
+               "Q1 (25th %ile)", "Q3 (75th %ile)", "IQR"],
+    "Value": [
+        f"{dur.mean():.2f} min",
+        f"{dur.median():.2f} min",
+        f"{dur.mode()[0]:.2f} min",
+        f"{dur.std():.2f} min",
+        f"{dur.min():.2f} min",
+        f"{dur.max():.2f} min",
+        f"{dur.quantile(0.25):.2f} min",
+        f"{dur.quantile(0.75):.2f} min",
+        f"{dur.quantile(0.75) - dur.quantile(0.25):.2f} min",
+    ]
+})
+display(stats_dur.style.hide(axis="index"))
+```
+
+### Distribution
+
+```{python}
+#| label: fig-dur-dist
+#| fig-cap: "Distribution of match durations (one point per game). The KDE overlay shows the smooth density."
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+# Histogram + KDE
+ax = axes[0]
+sns.histplot(
+    dur, bins=15, kde=True,
+    color=utils.PALETTE["primary"],
+    edgecolor=utils.PALETTE["bg"],
+    line_kws={"lw": 2.5, "color": utils.PALETTE["secondary"]},
+    ax=ax,
+)
+ax.axvline(dur.mean(),   color=utils.PALETTE["warning"], lw=1.8,
+           linestyle="--", label=f"Mean: {dur.mean():.1f} min")
+ax.axvline(dur.median(), color=utils.PALETTE["success"], lw=1.8,
+           linestyle=":",  label=f"Median: {dur.median():.1f} min")
+ax.legend(fontsize=9)
+ax.set_xlabel("Duration (minutes)")
+ax.set_ylabel("Count")
+ax.set_title("Histogram + KDE")
+
+# Box plot
+ax2 = axes[1]
+bp = ax2.boxplot(
+    dur.dropna(),
+    vert=True,
+    patch_artist=True,
+    widths=0.4,
+    boxprops=dict(facecolor=utils.PALETTE["primary"], color=utils.PALETTE["secondary"]),
+    medianprops=dict(color=utils.PALETTE["warning"], lw=2.5),
+    whiskerprops=dict(color=utils.PALETTE["muted"], lw=1.5),
+    capprops=dict(color=utils.PALETTE["muted"], lw=1.5),
+    flierprops=dict(marker="o", color=utils.PALETTE["danger"],
+                    markerfacecolor=utils.PALETTE["danger"], markersize=5),
+)
+ax2.set_ylabel("Duration (minutes)")
+ax2.set_title("Box Plot — Spread & Outliers")
+ax2.set_xticks([])
+
+fig.suptitle("Match Duration Distribution", fontsize=14, y=1.02)
+fig.tight_layout()
+plt.show()
+```
+
+::: {.insight-box}
+**Takeaway:** Match durations cluster tightly around **22–26 minutes**, a hallmark of high-level MPL play where teams snowball aggressively. The box plot shows little spread and minimal outliers, confirming games rarely drag past 30 minutes in this season.
+:::
+
+---
+
+## Kills
+
+### Summary Statistics
+
+```{python}
+#| label: tbl-kills-stats
+
+kills = df["K"]
+
+stats_k = pd.DataFrame({
+    "Metric": ["Mean", "Median", "Mode", "Std Dev", "Min", "Max",
+               "Q1", "Q3", "IQR", "Skewness"],
+    "Value": [
+        f"{kills.mean():.2f}",
+        f"{kills.median():.2f}",
+        f"{int(kills.mode()[0])}",
+        f"{kills.std():.2f}",
+        f"{kills.min()}",
+        f"{kills.max()}",
+        f"{kills.quantile(0.25):.1f}",
+        f"{kills.quantile(0.75):.1f}",
+        f"{kills.quantile(0.75) - kills.quantile(0.25):.1f}",
+        f"{kills.skew():.2f}",
+    ]
+})
+display(stats_k.style.hide(axis="index"))
+```
+
+### Distribution
+
+```{python}
+#| label: fig-kills-dist
+#| fig-cap: "Kill count distribution across all player-game rows."
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+ax = axes[0]
+counts = kills.value_counts().sort_index()
+ax.bar(
+    counts.index, counts.values,
+    color=utils.PALETTE["danger"],
+    edgecolor=utils.PALETTE["bg"],
+    alpha=0.9,
+)
+ax.axvline(kills.mean(),   color=utils.PALETTE["warning"], lw=2, ls="--",
+           label=f"Mean {kills.mean():.1f}")
+ax.axvline(kills.median(), color=utils.PALETTE["success"], lw=2, ls=":",
+           label=f"Median {kills.median():.0f}")
+ax.set_xlabel("Kills")
+ax.set_ylabel("Frequency")
+ax.set_title("Kill Count — Frequency Distribution")
+ax.legend(fontsize=9)
+
+# Violin plot
+ax2 = axes[1]
+parts = ax2.violinplot(
+    kills.dropna(), vert=True,
+    showmeans=True, showmedians=True,
+)
+for pc in parts["bodies"]:
+    pc.set_facecolor(utils.PALETTE["danger"])
+    pc.set_alpha(0.7)
+for key in ["cmeans", "cmedians", "cbars", "cmins", "cmaxes"]:
+    if key in parts:
+        parts[key].set_color(utils.PALETTE["warning"] if key == "cmeans"
+                             else utils.PALETTE["success"] if key == "cmedians"
+                             else utils.PALETTE["muted"])
+ax2.set_xticks([])
+ax2.set_ylabel("Kills")
+ax2.set_title("Violin Plot — Full Distribution Shape")
+
+fig.suptitle("Kills per Player per Game", fontsize=14, y=1.02)
+fig.tight_layout()
+plt.show()
+```
+
+::: {.insight-box}
+**Takeaway:** Kill counts are **right-skewed** with mode at 0–2 — most players are not primary damage dealers. The long right tail represents carry heroes (Marksmen, Fighters) who can accumulate 10+ kills in a dominant game. The mean is pulled above the median by these high-kill outliers.
+:::
+
+---
+
+## Deaths
+
+```{python}
+#| label: fig-deaths-dist
+#| fig-cap: "Distribution of deaths per player per game."
+
+deaths = df["D"]
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+ax = axes[0]
+dcounts = deaths.value_counts().sort_index()
+ax.bar(
+    dcounts.index, dcounts.values,
+    color=utils.PALETTE["warning"],
+    edgecolor=utils.PALETTE["bg"],
+    alpha=0.9,
+)
+ax.axvline(deaths.mean(), color=utils.PALETTE["danger"], lw=2, ls="--",
+           label=f"Mean {deaths.mean():.1f}")
+ax.set_xlabel("Deaths")
+ax.set_ylabel("Frequency")
+ax.set_title("Death Count — Frequency Distribution")
+ax.legend(fontsize=9)
+
+ax2 = axes[1]
+ax2.boxplot(
+    deaths.dropna(), vert=True,
+    patch_artist=True, widths=0.4,
+    boxprops=dict(facecolor=utils.PALETTE["warning"], color=utils.PALETTE["secondary"]),
+    medianprops=dict(color=utils.PALETTE["danger"], lw=2.5),
+    whiskerprops=dict(color=utils.PALETTE["muted"], lw=1.5),
+    capprops=dict(color=utils.PALETTE["muted"]),
+    flierprops=dict(marker="o", color=utils.PALETTE["danger"],
+                    markerfacecolor=utils.PALETTE["danger"], markersize=4),
+)
+ax2.set_ylabel("Deaths")
+ax2.set_xticks([])
+ax2.set_title("Box Plot — Spread & Outliers")
+
+fig.suptitle("Deaths per Player per Game", fontsize=14, y=1.02)
+fig.tight_layout()
+plt.show()
+```
+
+```{python}
+#| label: tbl-deaths-stats
+#| echo: false
+pd.DataFrame({
+    "Metric": ["Mean", "Median", "Mode", "Std Dev", "Q1", "Q3", "IQR", "Max"],
+    "Value": [
+        f"{deaths.mean():.2f}", f"{deaths.median():.1f}",
+        f"{int(deaths.mode()[0])}",
+        f"{deaths.std():.2f}",
+        f"{deaths.quantile(0.25):.1f}", f"{deaths.quantile(0.75):.1f}",
+        f"{deaths.quantile(0.75) - deaths.quantile(0.25):.1f}",
+        f"{deaths.max()}",
+    ]
+}).style.hide(axis="index")
+```
+
+::: {.insight-box}
+**Takeaway:** Deaths are distributed more symmetrically than kills, with a mode around 2–4. High death counts (6+) are relatively rare and typically signal a bad game for a carry player. Support and Tank players accept a slightly higher death count as part of frontline initiation.
+:::
+
+---
+
+## Assists
+
+```{python}
+#| label: fig-assists-dist
+#| fig-cap: "Assist count distribution — Supports and Tanks typically dominate this metric."
+
+assists = df["A"]
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+ax = axes[0]
+sns.histplot(assists, bins=20, ax=ax,
+             color=utils.PALETTE["success"], edgecolor=utils.PALETTE["bg"], kde=True,
+             line_kws={"lw": 2, "color": utils.PALETTE["secondary"]})
+ax.axvline(assists.mean(),   color=utils.PALETTE["warning"], lw=2, ls="--",
+           label=f"Mean {assists.mean():.1f}")
+ax.axvline(assists.median(), color=utils.PALETTE["accent"],  lw=2, ls=":",
+           label=f"Median {assists.median():.0f}")
+ax.set_xlabel("Assists")
+ax.set_title("Histogram + KDE")
+ax.legend(fontsize=9)
+
+ax2 = axes[1]
+ax2.boxplot(
+    assists.dropna(), vert=True, patch_artist=True, widths=0.4,
+    boxprops=dict(facecolor=utils.PALETTE["success"], color=utils.PALETTE["secondary"]),
+    medianprops=dict(color=utils.PALETTE["warning"], lw=2.5),
+    whiskerprops=dict(color=utils.PALETTE["muted"], lw=1.5),
+    capprops=dict(color=utils.PALETTE["muted"]),
+    flierprops=dict(marker="o", color=utils.PALETTE["danger"],
+                    markerfacecolor=utils.PALETTE["danger"], markersize=4),
+)
+ax2.set_ylabel("Assists")
+ax2.set_xticks([])
+ax2.set_title("Box Plot")
+
+fig.suptitle("Assists per Player per Game", fontsize=14, y=1.02)
+fig.tight_layout()
+plt.show()
+```
+
+::: {.insight-box}
+**Takeaway:** Assists are more broadly distributed than kills. Support players routinely record 10+ assists per game without a single kill, reflecting their team-enabling role. The right tail of the distribution highlights particularly active support/roam players in high-teamfight games.
+:::
+
+---
+
+## Gold Earned
+
+```{python}
+#| label: fig-gold-dist
+#| fig-cap: "Gold earned per player per game — the strongest proxy for resource efficiency."
+
+gold = df["Gold"]
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+ax = axes[0]
+sns.histplot(gold, bins=25, ax=ax,
+             color=utils.PALETTE["accent"], edgecolor=utils.PALETTE["bg"], kde=True,
+             line_kws={"lw": 2, "color": utils.PALETTE["secondary"]})
+ax.axvline(gold.mean(),   color=utils.PALETTE["warning"], lw=2, ls="--",
+           label=f"Mean {gold.mean():,.0f}")
+ax.axvline(gold.median(), color=utils.PALETTE["success"], lw=2, ls=":",
+           label=f"Median {gold.median():,.0f}")
+ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{x/1000:.0f}k"))
+ax.set_xlabel("Gold Earned (thousands)")
+ax.set_title("Histogram + KDE")
+ax.legend(fontsize=9)
+
+ax2 = axes[1]
+parts = ax2.violinplot(gold.dropna(), vert=True, showmeans=True, showmedians=True)
+for pc in parts["bodies"]:
+    pc.set_facecolor(utils.PALETTE["accent"])
+    pc.set_alpha(0.75)
+parts["cmeans"].set_color(utils.PALETTE["warning"])
+parts["cmedians"].set_color(utils.PALETTE["success"])
+ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda y, _: f"{y/1000:.0f}k"))
+ax2.set_xticks([])
+ax2.set_ylabel("Gold (thousands)")
+ax2.set_title("Violin Plot")
+
+fig.suptitle("Gold Earned per Player per Game", fontsize=14, y=1.02)
+fig.tight_layout()
+plt.show()
+```
+
+```{python}
+#| label: tbl-gold-stats
+pd.DataFrame({
+    "Metric": ["Mean", "Median", "Std Dev", "Min", "Max", "Q1", "Q3", "IQR"],
+    "Value": [
+        f"{gold.mean():,.0f}", f"{gold.median():,.0f}",
+        f"{gold.std():,.0f}",
+        f"{gold.min():,}", f"{gold.max():,}",
+        f"{gold.quantile(0.25):,.0f}", f"{gold.quantile(0.75):,.0f}",
+        f"{gold.quantile(0.75) - gold.quantile(0.25):,.0f}",
+    ]
+}).style.hide(axis="index")
+```
+
+::: {.insight-box}
+**Takeaway:** Gold is roughly bell-shaped with a slight right skew. The **IQR of ~4,000–5,000 gold** covers the bulk of players, while top-lane fighters and gold-lane marksmen drive the high end. Low gold values belong primarily to support/roam players who sacrifice income for vision and utility.
+:::
+
+---
+
+## KDA (Kill–Death–Assist Ratio)
+
+```{python}
+#| label: fig-kda-dist
+#| fig-cap: "KDA = (Kills + Assists) / max(Deaths, 1). Capped at 20 for readability."
+
+kda = df["kda"].clip(upper=20)
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+ax = axes[0]
+sns.histplot(kda, bins=30, ax=ax,
+             color=utils.PALETTE["secondary"], edgecolor=utils.PALETTE["bg"], kde=True,
+             line_kws={"lw": 2, "color": utils.PALETTE["primary"]})
+ax.axvline(kda.mean(),   color=utils.PALETTE["warning"], lw=2, ls="--",
+           label=f"Mean {kda.mean():.2f}")
+ax.axvline(kda.median(), color=utils.PALETTE["success"], lw=2, ls=":",
+           label=f"Median {kda.median():.2f}")
+ax.set_xlabel("KDA (capped at 20)")
+ax.set_title("Histogram + KDE")
+ax.legend(fontsize=9)
+
+ax2 = axes[1]
+ax2.boxplot(
+    kda.dropna(), vert=True, patch_artist=True, widths=0.4,
+    boxprops=dict(facecolor=utils.PALETTE["secondary"], color=utils.PALETTE["primary"]),
+    medianprops=dict(color=utils.PALETTE["warning"], lw=2.5),
+    whiskerprops=dict(color=utils.PALETTE["muted"], lw=1.5),
+    capprops=dict(color=utils.PALETTE["muted"]),
+    flierprops=dict(marker="o", color=utils.PALETTE["danger"],
+                    markerfacecolor=utils.PALETTE["danger"], markersize=4),
+)
+ax2.set_ylabel("KDA")
+ax2.set_xticks([])
+ax2.set_title("Box Plot")
+
+fig.suptitle("KDA Distribution (all players)", fontsize=14, y=1.02)
+fig.tight_layout()
+plt.show()
+```
+
+::: {.insight-box}
+**Takeaway:** The KDA distribution is strongly right-skewed. A large fraction of players fall between KDA 2–5, representing solid competitive performances. The long right tail consists mainly of support heroes who die rarely but collect many assists — inflating the ratio — and hyper-carries who dominate without dying.
+:::
+
+---
+
+## Role Distribution
+
+```{python}
+#| label: fig-role-dist
+#| fig-cap: "How frequently each primary role was picked across all games."
+
+role_counts = df["role"].value_counts().reset_index()
+role_counts.columns = ["Role", "Count"]
+
+fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+
+# Bar chart
+ax = axes[0]
+colors = [utils.ROLE_COLORS.get(r, utils.PALETTE["muted"]) for r in role_counts["Role"]]
+bars = ax.bar(role_counts["Role"], role_counts["Count"],
+              color=colors, edgecolor=utils.PALETTE["bg"], alpha=0.9)
+for bar, cnt in zip(bars, role_counts["Count"]):
+    ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 3,
+            str(cnt), ha="center", va="bottom", fontsize=9,
+            color=utils.PALETTE["text"], fontweight="bold")
+ax.set_xlabel("Primary Role")
+ax.set_ylabel("Pick Count")
+ax.set_title("Role Pick Frequency")
+ax.tick_params(axis="x", rotation=30)
+
+# Pie chart
+ax2 = axes[1]
+wedges, texts, autotexts = ax2.pie(
+    role_counts["Count"],
+    labels=role_counts["Role"],
+    colors=colors,
+    autopct="%1.1f%%",
+    startangle=140,
+    wedgeprops=dict(edgecolor=utils.PALETTE["bg"], linewidth=1.5),
+    textprops=dict(color=utils.PALETTE["text"], fontsize=9),
+)
+for at in autotexts:
+    at.set_color(utils.PALETTE["surface"])
+    at.set_fontsize(8)
+ax2.set_title("Role Share (Pie)", pad=12)
+
+fig.suptitle("Role Pick Distribution — MPL Cambodia S6", fontsize=14, y=1.02)
+fig.tight_layout()
+plt.show()
+```
+
+::: {.insight-box}
+**Takeaway:** In every game, each team fields exactly one player per lane — typically Tank, Fighter, Marksman, Mage, and Support/Roam. The near-equal distribution across Fighter, Tank, Support, Marksman, and Mage confirms this standard 5-role meta, with Assassins appearing occasionally as substitutes for Fighter or Mage picks.
+:::
+
+---
+
+## Objectives (Tower, Lord, Turtle)
+
+```{python}
+#| label: fig-objectives
+#| fig-cap: "Per-game team objective counts — one data point per team per game."
+
+ml = utils.match_level(df)
+obj_cols = ["Tower", "Lord", "Turtle"]
+
+fig, axes = plt.subplots(1, 3, figsize=(14, 5))
+obj_colors = [utils.PALETTE["accent"], utils.PALETTE["warning"], utils.PALETTE["success"]]
+
+for ax, col, color in zip(axes, obj_cols, obj_colors):
+    data = ml[col].dropna()
+    counts = data.value_counts().sort_index()
+    ax.bar(counts.index, counts.values, color=color, edgecolor=utils.PALETTE["bg"], alpha=0.9)
+    ax.axvline(data.mean(), color=utils.PALETTE["text"], lw=1.8, ls="--",
+               label=f"Mean: {data.mean():.1f}")
+    ax.set_xlabel(col + "s")
+    ax.set_ylabel("Frequency")
+    ax.set_title(f"{col} Count Distribution")
+    ax.legend(fontsize=9)
+
+fig.suptitle("Team Objective Counts per Game", fontsize=14, y=1.02)
+fig.tight_layout()
+plt.show()
+```
+
+```{python}
+#| label: tbl-objectives
+obj_stats = ml[["Tower", "Lord", "Turtle"]].describe().T.round(2)
+obj_stats.columns = ["Count", "Mean", "Std Dev", "Min", "Q1", "Median", "Q3", "Max"]
+obj_stats.style
+```
+
+::: {.insight-box}
+**Takeaway:** The **Tower** count varies widely (0 to 10+) because the winning team often demolishes everything while the losing side gets few if any. **Lord** and **Turtle** are limited by the number of spawns per game — most teams secure 1–3 turtles and 0–2 lords, with the winning team taking the majority.
+:::

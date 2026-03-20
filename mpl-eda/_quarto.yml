@@ -1,0 +1,65 @@
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: "MPL Cambodia S6 — EDA"
+  description: "End-to-end Exploratory Data Analysis of Mobile Legends Professional League Cambodia Season 6"
+  favicon: "assets/favicon.png"
+
+  navbar:
+    background: "#ffffff"
+    foreground: "#1e293b"
+    logo-alt: "MPL Cambodia S6"
+    title: "🎮 MPL Cambodia S6"
+    left:
+      - href: index.qmd
+        text: "Home"
+      - href: teams.qmd
+        text: "Teams & Rosters"
+      - href: dataset.qmd
+        text: "Dataset"
+      - href: univariate.qmd
+        text: "Univariate"
+      - href: bivariate.qmd
+        text: "Bivariate"
+      - href: insights.qmd
+        text: "Insights"
+    right:
+      - icon: github
+        href: "#"
+        aria-label: GitHub
+
+  sidebar: false
+
+  page-footer:
+    center: |
+      MPL Cambodia Season 6 · EDA Project · Built with [Quarto](https://quarto.org)
+
+format:
+  html:
+    theme:
+      - cosmo
+      - custom.scss
+    code-fold: true
+    code-tools: true
+    code-summary: "Show code"
+    toc: true
+    toc-depth: 3
+    toc-title: "On this page"
+    number-sections: false
+    smooth-scroll: true
+    highlight-style: arrow-light
+    fig-align: center
+    fig-width: 10
+    fig-height: 6
+    self-contained: false
+    html-math-method: katex
+
+execute:
+  echo: true
+  warning: false
+  message: false
+  freeze: false
+
+jupyter: python3

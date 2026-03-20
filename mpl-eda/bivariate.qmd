@@ -1,0 +1,458 @@
+---
+title: "Bivariate & Relationship Analysis"
+subtitle: "Uncovering patterns between pairs of variables — from gold and kills to roles and performance"
+---
+
+```{python}
+#| echo: false
+import sys, pathlib
+sys.path.insert(0, str(pathlib.Path(".").resolve()))
+import utils
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+import seaborn as sns
+
+df = utils.load_data()
+ml = utils.match_level(df)
+utils.apply_dark_theme()
+```
+
+Bivariate analysis helps us move beyond distributions and ask: **do two variables move together?** Here we use scatter plots, box plots, grouped bar charts, and a correlation matrix to reveal the relationships embedded in the MPL Cambodia S6 data.
+
+---
+
+## Kills vs Gold Earned
+
+Gold is the engine of power in Mobile Legends — more gold means better items, which means more kills. But does having more kills actually guarantee more gold?
+
+```{python}
+#| label: fig-kills-gold
+#| fig-cap: "Scatter plot of kills vs gold earned, coloured by player role."
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+# Scatter — coloured by role
+ax = axes[0]
+roles = df["role"].unique()
+for role in roles:
+    subset = df[df["role"] == role]
+    ax.scatter(
+        subset["K"], subset["Gold"],
+        color=utils.ROLE_COLORS.get(role, utils.PALETTE["muted"]),
+        alpha=0.55, s=22, label=role, edgecolors="none",
+    )
+
+# Regression line
+from numpy.polynomial.polynomial import polyfit
+mask = df["K"].notna() & df["Gold"].notna()
+x = df.loc[mask, "K"].values
+y = df.loc[mask, "Gold"].values
+m, b = np.polyfit(x, y, 1)
+xline = np.linspace(x.min(), x.max(), 100)
+ax.plot(xline, m * xline + b, color=utils.PALETTE["warning"], lw=2, ls="--",
+        label=f"Trend (r={np.corrcoef(x, y)[0,1]:.2f})")
+
+ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v/1000:.0f}k"))
+ax.set_xlabel("Kills")
+ax.set_ylabel("Gold Earned")
+ax.set_title("Kills vs Gold — by Role")
+ax.legend(fontsize=8, ncol=2, framealpha=0.4)
+
+# Faceted by win/loss
+ax2 = axes[1]
+for outcome, color in utils.WIN_COLORS.items():
+    subset = df[df["Win"].str.strip() == outcome]
+    ax2.scatter(
+        subset["K"], subset["Gold"],
+        color=color, alpha=0.45, s=20, label=outcome, edgecolors="none",
+    )
+ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v/1000:.0f}k"))
+ax2.set_xlabel("Kills")
+ax2.set_ylabel("Gold Earned")
+ax2.set_title("Kills vs Gold — Win vs Lose")
+ax2.legend(fontsize=9)
+
+fig.suptitle("Kills ↔ Gold Relationship", fontsize=14, y=1.02)
+fig.tight_layout()
+plt.show()
+```
+
+```{python}
+#| label: tbl-kills-gold-corr
+r_val = df[["K", "Gold"]].corr().iloc[0, 1]
+pd.DataFrame({
+    "Metric": ["Pearson Correlation (r)", "r²  (variance explained)"],
+    "Value":  [f"{r_val:.4f}", f"{r_val**2:.4f}"],
+}).style.hide(axis="index")
+```
+
+::: {.insight-box}
+**Takeaway:** There is a **moderate-to-strong positive correlation** between kills and gold — players with more kills tend to earn significantly more. However, the scatter shows notable spread, especially for support roles who earn low gold despite respectable KDA contributions. The Win cluster sits consistently higher in gold, confirming that gold advantage is a strong predictor of victory.
+:::
+
+---
+
+## KDA vs Gold — Efficiency Relationship
+
+```{python}
+#| label: fig-kda-gold
+#| fig-cap: "KDA vs gold earned. Outlier KDAs (> 15) are capped for clarity."
+
+kda_capped = df["kda"].clip(upper=15)
+
+fig, ax = plt.subplots(figsize=(10, 5))
+for outcome, color in utils.WIN_COLORS.items():
+    mask = df["Win"].str.strip() == outcome
+    ax.scatter(
+        kda_capped[mask], df.loc[mask, "Gold"],
+        color=color, alpha=0.4, s=20, label=outcome, edgecolors="none",
+    )
+
+# Trend line
+mask2 = kda_capped.notna() & df["Gold"].notna()
+m2, b2 = np.polyfit(kda_capped[mask2].values, df.loc[mask2, "Gold"].values, 1)
+xline = np.linspace(0, 15, 100)
+ax.plot(xline, m2 * xline + b2, color=utils.PALETTE["warning"], lw=2, ls="--",
+        label="Trend")
+
+ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v/1000:.0f}k"))
+ax.set_xlabel("KDA (capped at 15)")
+ax.set_ylabel("Gold Earned")
+ax.set_title("KDA vs Gold Earned — Win/Lose Comparison")
+ax.legend(fontsize=9)
+fig.tight_layout()
+plt.show()
+```
+
+::: {.insight-box}
+**Takeaway:** The KDA–gold relationship is positive but noisy. High-KDA support players can still record relatively low gold, while low-KDA tanks can have average gold due to their farm priority. The cleanest signal is that **winning players** (green) cluster in the upper-right, combining high gold with better KDA — confirming that dominant performances come in both metrics together.
+:::
+
+---
+
+## Match Duration vs Total Objectives
+
+Longer games allow more objective respawns — but do teams consistently secure more objectives when matches last longer?
+
+```{python}
+#| label: fig-dur-obj
+#| fig-cap: "Match duration (minutes) vs total objectives (Tower + Lord + Turtle), split by outcome."
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+ax = axes[0]
+for outcome, color in utils.WIN_COLORS.items():
+    mask = ml["Win"].str.strip() == outcome
+    ax.scatter(
+        ml.loc[mask, "dur_min"],
+        ml.loc[mask, "objectives"],
+        color=color, alpha=0.6, s=35, label=outcome, edgecolors="none",
+    )
+m3, b3 = np.polyfit(ml["dur_min"].values, ml["objectives"].values, 1)
+xline = np.linspace(ml["dur_min"].min(), ml["dur_min"].max(), 100)
+ax.plot(xline, m3 * xline + b3, color=utils.PALETTE["warning"], lw=2, ls="--",
+        label=f"Trend (r={np.corrcoef(ml['dur_min'], ml['objectives'])[0,1]:.2f})")
+ax.set_xlabel("Match Duration (min)")
+ax.set_ylabel("Total Objectives")
+ax.set_title("Duration vs Total Objectives")
+ax.legend(fontsize=9)
+
+# Hexbin
+ax2 = axes[1]
+hb = ax2.hexbin(
+    ml["dur_min"], ml["objectives"],
+    gridsize=15, cmap="YlOrRd",
+    mincnt=1, linewidths=0.3,
+)
+cb = fig.colorbar(hb, ax=ax2, shrink=0.8)
+cb.set_label("Count", color=utils.PALETTE["text"])
+cb.ax.yaxis.set_tick_params(color=utils.PALETTE["text"])
+plt.setp(cb.ax.yaxis.get_ticklabels(), color=utils.PALETTE["text"])
+ax2.set_xlabel("Match Duration (min)")
+ax2.set_ylabel("Total Objectives")
+ax2.set_title("Density (Hexbin)")
+
+fig.suptitle("Match Duration ↔ Total Objectives", fontsize=14, y=1.02)
+fig.tight_layout()
+plt.show()
+```
+
+::: {.insight-box}
+**Takeaway:** Longer games tend to produce more total objectives, but the relationship is weaker than expected — many matches are decided by one dominant team taking nearly all objectives quickly. The hexbin density shows that the "sweet spot" of 20–26 minutes with 10–15 total objectives is the most common game state.
+:::
+
+---
+
+## Role vs Performance Metrics (Boxplots)
+
+Different roles have inherently different playstyles — Tanks absorb damage and die more, Marksmen farm gold and convert it to kills. These grouped boxplots reveal those structural differences.
+
+```{python}
+#| label: fig-role-kda
+#| fig-cap: "KDA distribution by primary role."
+
+role_order = ["Tank", "Fighter", "Marksman", "Mage", "Support", "Assassin", "Other"]
+role_palette = [utils.ROLE_COLORS.get(r, utils.PALETTE["muted"]) for r in role_order]
+
+kda_capped2 = df["kda"].clip(upper=15)
+
+fig, ax = plt.subplots(figsize=(11, 5))
+data_by_role = [
+    kda_capped2[df["role"] == r].dropna().values
+    for r in role_order
+]
+bp = ax.boxplot(
+    data_by_role,
+    labels=role_order,
+    patch_artist=True,
+    widths=0.55,
+    medianprops=dict(color="#f8fafc", lw=2.5),
+    whiskerprops=dict(color=utils.PALETTE["muted"], lw=1.5),
+    capprops=dict(color=utils.PALETTE["muted"]),
+    flierprops=dict(marker="o", markersize=3, alpha=0.4,
+                    markerfacecolor=utils.PALETTE["danger"],
+                    color=utils.PALETTE["danger"]),
+)
+for patch, color in zip(bp["boxes"], role_palette):
+    patch.set_facecolor(color)
+    patch.set_alpha(0.8)
+
+ax.set_xlabel("Primary Role")
+ax.set_ylabel("KDA (capped at 15)")
+ax.set_title("KDA Distribution by Role", pad=12)
+ax.tick_params(axis="x", rotation=15)
+fig.tight_layout()
+plt.show()
+```
+
+```{python}
+#| label: fig-role-gold
+#| fig-cap: "Gold earned distribution by role — confirming the carry/support gold gap."
+
+fig, ax = plt.subplots(figsize=(11, 5))
+data_by_role_gold = [
+    df.loc[df["role"] == r, "Gold"].dropna().values
+    for r in role_order
+]
+bp2 = ax.boxplot(
+    data_by_role_gold,
+    labels=role_order,
+    patch_artist=True,
+    widths=0.55,
+    medianprops=dict(color="#f8fafc", lw=2.5),
+    whiskerprops=dict(color=utils.PALETTE["muted"], lw=1.5),
+    capprops=dict(color=utils.PALETTE["muted"]),
+    flierprops=dict(marker="o", markersize=3, alpha=0.4,
+                    markerfacecolor=utils.PALETTE["danger"],
+                    color=utils.PALETTE["danger"]),
+)
+for patch, color in zip(bp2["boxes"], role_palette):
+    patch.set_facecolor(color)
+    patch.set_alpha(0.8)
+
+ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v/1000:.0f}k"))
+ax.set_xlabel("Primary Role")
+ax.set_ylabel("Gold Earned")
+ax.set_title("Gold Earned Distribution by Role", pad=12)
+ax.tick_params(axis="x", rotation=15)
+fig.tight_layout()
+plt.show()
+```
+
+```{python}
+#| label: tbl-role-perf
+#| fig-cap: "Mean performance metrics grouped by primary role."
+
+role_stats = (
+    df.groupby("role")
+      .agg(
+          Count      = ("Players", "count"),
+          Mean_K     = ("K",    "mean"),
+          Mean_D     = ("D",    "mean"),
+          Mean_A     = ("A",    "mean"),
+          Mean_Gold  = ("Gold", "mean"),
+          Mean_KDA   = ("kda",  "mean"),
+      )
+      .round(2)
+      .reset_index()
+)
+role_stats.columns = ["Role", "Rows", "Avg Kills", "Avg Deaths",
+                      "Avg Assists", "Avg Gold", "Avg KDA"]
+role_stats.sort_values("Avg Gold", ascending=False)\
+    .style.hide(axis="index").format({"Avg Gold": "{:,.0f}"})
+```
+
+::: {.insight-box}
+**Takeaway:** The **Marksman** and **Fighter** roles lead in gold and kills, confirming their carry priority. **Support** and **Tank** players have the lowest gold but often the highest assists — their value lies in enabling teammates rather than personal stats. **Assassins** record high KDA when they snowball but have extreme variance — boom or bust.
+:::
+
+---
+
+## Win Rate by Role
+
+```{python}
+#| label: fig-role-winrate
+#| fig-cap: "Win rate (% of games won) for each primary role."
+
+role_win = (
+    df.groupby("role")["win_bool"]
+      .agg(["mean", "count"])
+      .reset_index()
+)
+role_win.columns = ["Role", "Win Rate", "Picks"]
+role_win["Win Rate %"] = role_win["Win Rate"] * 100
+role_win = role_win.sort_values("Win Rate %", ascending=False)
+
+fig, ax = plt.subplots(figsize=(9, 4))
+colors_wr = [utils.ROLE_COLORS.get(r, utils.PALETTE["muted"]) for r in role_win["Role"]]
+bars = ax.bar(role_win["Role"], role_win["Win Rate %"],
+              color=colors_wr, edgecolor=utils.PALETTE["bg"], alpha=0.9)
+ax.axhline(50, color=utils.PALETTE["warning"], lw=1.5, ls="--",
+           label="50% baseline")
+
+for bar, val in zip(bars, role_win["Win Rate %"]):
+    ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5,
+            f"{val:.1f}%", ha="center", va="bottom",
+            fontsize=9, color=utils.PALETTE["text"], fontweight="bold")
+
+ax.set_ylim(0, 70)
+ax.set_ylabel("Win Rate (%)")
+ax.set_title("Win Rate by Primary Role", pad=12)
+ax.tick_params(axis="x", rotation=20)
+ax.legend(fontsize=9)
+fig.tight_layout()
+plt.show()
+```
+
+::: {.insight-box}
+**Takeaway:** Win rates by role hover near 50% as expected — every game has one winner from each role. Slight deviations reflect meta dominance; roles with pick rates above average in winning games suggest that those roles are draft priorities in the current meta.
+:::
+
+---
+
+## Correlation Matrix — Numeric Features
+
+```{python}
+#| label: fig-corr-matrix
+#| fig-cap: "Pearson correlation heatmap for core numeric features."
+
+numeric_cols = ["K", "D", "A", "Gold", "kda", "dur_min",
+                "Tower", "Lord", "Turtle"]
+
+fig = utils.corr_heatmap(df, numeric_cols, title="Correlation Matrix — Performance & Objectives")
+plt.show()
+```
+
+::: {.insight-box}
+**Key correlations to note:**
+
+- **Gold ↔ K**: Strong positive — carries earn more gold by getting kills.
+- **K ↔ A**: Moderate positive — team fights produce multiple participants.
+- **D ↔ K**: Slight positive — aggressive players take risks that lead to both kills and deaths.
+- **Duration ↔ Objectives**: Moderate positive — longer games produce more objective contests.
+- **KDA ↔ Gold**: Positive, but weaker than expected — role differences break this pattern.
+:::
+
+---
+
+## Win vs Lose — Side-by-Side Comparisons
+
+```{python}
+#| label: fig-win-lose
+#| fig-cap: "Mean values of key metrics split by game outcome."
+
+metrics = ["K", "D", "A", "Gold", "kda"]
+labels  = ["Kills", "Deaths", "Assists", "Gold (k)", "KDA"]
+divisors = [1, 1, 1, 1000, 1]
+
+win_means  = df[df["win_bool"]  == True ][metrics].mean()
+lose_means = df[df["win_bool"] == False][metrics].mean()
+
+win_vals  = [win_means[m]  / d for m, d in zip(metrics, divisors)]
+lose_vals = [lose_means[m] / d for m, d in zip(metrics, divisors)]
+
+x = np.arange(len(labels))
+width = 0.36
+
+fig, ax = plt.subplots(figsize=(11, 5))
+b1 = ax.bar(x - width/2, win_vals,  width, label="Win",
+            color=utils.PALETTE["success"], edgecolor=utils.PALETTE["bg"], alpha=0.9)
+b2 = ax.bar(x + width/2, lose_vals, width, label="Lose",
+            color=utils.PALETTE["danger"],  edgecolor=utils.PALETTE["bg"], alpha=0.9)
+
+for bar in list(b1) + list(b2):
+    h = bar.get_height()
+    ax.text(bar.get_x() + bar.get_width() / 2, h + 0.05,
+            f"{h:.1f}", ha="center", va="bottom",
+            fontsize=8.5, color=utils.PALETTE["text"], fontweight="bold")
+
+ax.set_xticks(x)
+ax.set_xticklabels(labels)
+ax.set_ylabel("Mean Value")
+ax.set_title("Win vs Lose — Mean Performance Metrics", pad=12)
+ax.legend(fontsize=10)
+fig.tight_layout()
+plt.show()
+```
+
+::: {.insight-box}
+**Takeaway:** Winners have substantially higher kills, assists, gold, and KDA — and crucially, fewer deaths. The difference in gold is particularly striking: winning players earn several thousand more gold on average, translating directly into stronger itemization and the ability to close out games.
+:::
+
+---
+
+## Match Duration Across Tournament Stages
+
+```{python}
+#| label: fig-stage-duration
+#| fig-cap: "Match duration distribution per tournament stage — later stages tend to be closer and longer."
+
+stage_order = [
+    "Regular Season",
+    "Upper Bracket Quarterfinals",
+    "Upper Bracket Semifinals",
+    "Upper Bracket Final",
+    "Lower Bracket Semifinal",
+    "Lower Bracket Final",
+    "5th place match",
+    "Grand Final",
+]
+stage_dur = df.groupby(["Match", "Stage", "team_clean"])["dur_min"].first().reset_index()
+stage_dur = stage_dur[stage_dur["Stage"].isin(stage_order)]
+
+fig, ax = plt.subplots(figsize=(12, 5))
+stage_data = [
+    stage_dur[stage_dur["Stage"] == s]["dur_min"].dropna().values
+    for s in stage_order if s in stage_dur["Stage"].unique()
+]
+present_stages = [s for s in stage_order if s in stage_dur["Stage"].unique()]
+
+bp = ax.boxplot(
+    stage_data,
+    labels=[s.replace(" ", "\n") for s in present_stages],
+    patch_artist=True,
+    widths=0.5,
+    medianprops=dict(color=utils.PALETTE["warning"], lw=2.5),
+    whiskerprops=dict(color=utils.PALETTE["muted"], lw=1.3),
+    capprops=dict(color=utils.PALETTE["muted"]),
+    flierprops=dict(marker="o", markersize=4, alpha=0.5,
+                    color=utils.PALETTE["danger"],
+                    markerfacecolor=utils.PALETTE["danger"]),
+)
+colors_stage = sns.color_palette("husl", len(present_stages))
+for patch, color in zip(bp["boxes"], colors_stage):
+    patch.set_facecolor(color)
+    patch.set_alpha(0.8)
+
+ax.set_ylabel("Duration (minutes)")
+ax.set_title("Match Duration by Tournament Stage", pad=12)
+ax.tick_params(axis="x", labelsize=8)
+fig.tight_layout()
+plt.show()
+```
+
+::: {.insight-box}
+**Takeaway:** Playoff stages generally show higher variance in match duration than the Regular Season — because seeded favourites can dominate quickly, but close games between evenly matched teams tend to extend. The Grand Final is typically the hardest-fought match with the longest and most variable duration.
+:::

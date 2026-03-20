@@ -1,0 +1,408 @@
+---
+title: "Teams & Rosters"
+subtitle: "Meet the eight teams that competed in MPL Cambodia Season 6"
+toc: true
+toc-depth: 2
+---
+
+```{python}
+#| echo: false
+import sys, pathlib
+sys.path.insert(0, str(pathlib.Path(".").resolve()))
+import utils
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import seaborn as sns
+
+df  = utils.load_data()
+ml  = utils.match_level(df)
+utils.apply_dark_theme()
+
+# ── Pre-compute player summaries ──────────────────────────────────────────────
+player_summary = (
+    df.groupby(["team_clean", "Players"])
+      .agg(
+          games     = ("K",     "count"),
+          role      = ("role",  lambda x: x.mode()[0]),
+          fav_hero  = ("Pick",  lambda x: x.mode()[0]),
+          hero_pool = ("Pick",  "nunique"),
+          avg_kda   = ("kda",   "mean"),
+          avg_gold  = ("Gold",  "mean"),
+          avg_k     = ("K",     "mean"),
+          avg_d     = ("D",     "mean"),
+          avg_a     = ("A",     "mean"),
+          mvp_total = ("MVP",   "sum"),
+      )
+      .reset_index()
+      .round({"avg_kda": 2, "avg_gold": 0, "avg_k": 1, "avg_d": 1, "avg_a": 1})
+)
+
+# Team-level record
+team_record = (
+    df.groupby("team_clean")["win_bool"]
+      .agg(wins=("sum"), games_rows=("count"))
+      .assign(
+          game_count = lambda x: (x["games_rows"] / 5).astype(int),
+          losses     = lambda x: (x["games_rows"] / 5).astype(int) - (x["wins"] / 5).astype(int),
+          win_games  = lambda x: (x["wins"] / 5).astype(int),
+          win_rate   = lambda x: (x["wins"] / x["games_rows"] * 100).round(1),
+      )
+      .reset_index()
+)
+
+ROLE_ICONS = {
+    "Fighter":  "⚔️",
+    "Tank":     "🛡️",
+    "Marksman": "🏹",
+    "Mage":     "🔮",
+    "Support":  "💚",
+    "Assassin": "🗡️",
+    "Other":    "❓",
+}
+
+def role_icon(r):
+    return ROLE_ICONS.get(r, "❓")
+
+def star_bar(mvp, max_mvp=12):
+    filled = min(int(round(mvp / max(max_mvp,1) * 5)), 5)
+    return "★" * filled + "☆" * (5 - filled)
+
+def kda_badge(kda):
+    if kda >= 7:   return "🔥 Elite"
+    if kda >= 5:   return "💪 Strong"
+    if kda >= 3.5: return "👍 Solid"
+    return "📈 Developing"
+```
+
+MPL Cambodia Season 6 featured **eight teams** drawn from Cambodia's competitive MLBB scene. Below is a full roster introduction for every team, including each player's primary role, signature hero, and key performance figures.
+
+---
+
+## 🏆 See You Soon
+
+```{python}
+#| echo: false
+team = "See You Soon"
+rec  = team_record[team_record["team_clean"] == team].iloc[0]
+col  = utils.TEAM_COLORS[team]
+
+print(f"Record: {rec['win_games']}W – {rec['losses']}L  |  Win Rate: {rec['win_rate']}%")
+```
+
+::: {.team-card style="border-left: 5px solid #4f46e5; background: #eef2ff; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;"}
+**See You Soon** ended the regular season as one of the top seeds, powered by a cohesive roster with exceptional mage and fighter synergy. Their star mage **Raa** posted the highest KDA among all players, while **MPTheKing** anchored the fighter role with consistent MVP-level performances.
+:::
+
+```{python}
+#| echo: false
+t = player_summary[player_summary["team_clean"] == "See You Soon"].sort_values("games", ascending=False)
+out = t[["Players","role","fav_hero","games","avg_kda","avg_k","avg_d","avg_a","avg_gold","mvp_total","hero_pool"]].copy()
+out.columns = ["Player","Role","Signature Hero","Games","KDA","K","D","A","Avg Gold","MVPs","Hero Pool"]
+out["Role"] = out["Role"].apply(lambda r: f"{role_icon(r)} {r}")
+out["KDA Badge"] = out["KDA"].apply(kda_badge)
+out["Avg Gold"] = out["Avg Gold"].apply(lambda g: f"{int(g):,}")
+out = out.reset_index(drop=True)
+out.index += 1
+out.style.format({"KDA": "{:.2f}", "K": "{:.1f}", "D": "{:.1f}", "A": "{:.1f}"})
+```
+
+---
+
+## 🐉 DRoar Legends
+
+```{python}
+#| echo: false
+team = "DRoar Legends"
+rec  = team_record[team_record["team_clean"] == team].iloc[0]
+print(f"Record: {rec['win_games']}W – {rec['losses']}L  |  Win Rate: {rec['win_rate']}%")
+```
+
+::: {.team-card style="border-left: 5px solid #dc2626; background: #fef2f2; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;"}
+**DRoar Legends** played the most games of any team this season, a testament to their deep playoff run. Their marksman **Wickyy** led the entire tournament in MVP awards (11), making them one of the most carry-reliant rosters. The duo of **Aykii** and **Linnn** gave them elite mid-lane and fighter flexibility.
+:::
+
+```{python}
+#| echo: false
+t = player_summary[player_summary["team_clean"] == "DRoar Legends"].sort_values("games", ascending=False)
+out = t[["Players","role","fav_hero","games","avg_kda","avg_k","avg_d","avg_a","avg_gold","mvp_total","hero_pool"]].copy()
+out.columns = ["Player","Role","Signature Hero","Games","KDA","K","D","A","Avg Gold","MVPs","Hero Pool"]
+out["Role"] = out["Role"].apply(lambda r: f"{role_icon(r)} {r}")
+out["KDA Badge"] = out["KDA"].apply(kda_badge)
+out["Avg Gold"] = out["Avg Gold"].apply(lambda g: f"{int(g):,}")
+out = out.reset_index(drop=True)
+out.index += 1
+out.style.format({"KDA": "{:.2f}", "K": "{:.1f}", "D": "{:.1f}", "A": "{:.1f}"})
+```
+
+---
+
+## 🔥 Team Flash KH
+
+```{python}
+#| echo: false
+team = "Team Flash KH"
+rec  = team_record[team_record["team_clean"] == team].iloc[0]
+print(f"Record: {rec['win_games']}W – {rec['losses']}L  |  Win Rate: {rec['win_rate']}%")
+```
+
+::: {.team-card style="border-left: 5px solid #db2777; background: #fdf2f8; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;"}
+**Team Flash KH** is the Cambodian affiliate of the iconic Team Flash brand, bringing a structured, disciplined approach to drafts. **Owl** emerged as their franchise marksman with 9 MVPs and a wide hero pool. The team's depth was shown through mid-season roster adjustments, introducing **D7** and **C Cat** to complement their core.
+:::
+
+```{python}
+#| echo: false
+t = player_summary[player_summary["team_clean"] == "Team Flash KH"].sort_values("games", ascending=False)
+out = t[["Players","role","fav_hero","games","avg_kda","avg_k","avg_d","avg_a","avg_gold","mvp_total","hero_pool"]].copy()
+out.columns = ["Player","Role","Signature Hero","Games","KDA","K","D","A","Avg Gold","MVPs","Hero Pool"]
+out["Role"] = out["Role"].apply(lambda r: f"{role_icon(r)} {r}")
+out["KDA Badge"] = out["KDA"].apply(kda_badge)
+out["Avg Gold"] = out["Avg Gold"].apply(lambda g: f"{int(g):,}")
+out = out.reset_index(drop=True)
+out.index += 1
+out.style.format({"KDA": "{:.2f}", "K": "{:.1f}", "D": "{:.1f}", "A": "{:.1f}"})
+```
+
+---
+
+## 🎮 CFU Gaming
+
+```{python}
+#| echo: false
+team = "CFU Gaming"
+rec  = team_record[team_record["team_clean"] == team].iloc[0]
+print(f"Record: {rec['win_games']}W – {rec['losses']}L  |  Win Rate: {rec['win_rate']}%")
+```
+
+::: {.team-card style="border-left: 5px solid #16a34a; background: #f0fdf4; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;"}
+**CFU Gaming** ran one of the tightest five-man cores in the league — every player appeared in all 21 games. Their gold laner **Xingg** was the most decorated with 5 MVPs, complemented by the versatile mage **Zee** who posted the squad's highest KDA. CFU's consistency across roles made them a difficult team to draft against.
+:::
+
+```{python}
+#| echo: false
+t = player_summary[player_summary["team_clean"] == "CFU Gaming"].sort_values("games", ascending=False)
+out = t[["Players","role","fav_hero","games","avg_kda","avg_k","avg_d","avg_a","avg_gold","mvp_total","hero_pool"]].copy()
+out.columns = ["Player","Role","Signature Hero","Games","KDA","K","D","A","Avg Gold","MVPs","Hero Pool"]
+out["Role"] = out["Role"].apply(lambda r: f"{role_icon(r)} {r}")
+out["KDA Badge"] = out["KDA"].apply(kda_badge)
+out["Avg Gold"] = out["Avg Gold"].apply(lambda g: f"{int(g):,}")
+out = out.reset_index(drop=True)
+out.index += 1
+out.style.format({"KDA": "{:.2f}", "K": "{:.1f}", "D": "{:.1f}", "A": "{:.1f}"})
+```
+
+---
+
+## 🦆 Duck Rice Esport
+
+```{python}
+#| echo: false
+team = "Duck Rice Esport"
+rec  = team_record[team_record["team_clean"] == team].iloc[0]
+print(f"Record: {rec['win_games']}W – {rec['losses']}L  |  Win Rate: {rec['win_rate']}%")
+```
+
+::: {.team-card style="border-left: 5px solid #0284c7; background: #f0f9ff; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;"}
+**Duck Rice Esport** had one of the widest hero pools in the tournament. **NJ** and **Darkside** showed exceptional versatility — NJ played 16 different heroes across the season and Darkside racked up 6 MVPs. Despite finishing below .500, this team demonstrated that hero variety is a strategic asset even when results are mixed.
+:::
+
+```{python}
+#| echo: false
+t = player_summary[player_summary["team_clean"] == "Duck Rice Esport"].sort_values("games", ascending=False)
+out = t[["Players","role","fav_hero","games","avg_kda","avg_k","avg_d","avg_a","avg_gold","mvp_total","hero_pool"]].copy()
+out.columns = ["Player","Role","Signature Hero","Games","KDA","K","D","A","Avg Gold","MVPs","Hero Pool"]
+out["Role"] = out["Role"].apply(lambda r: f"{role_icon(r)} {r}")
+out["KDA Badge"] = out["KDA"].apply(kda_badge)
+out["Avg Gold"] = out["Avg Gold"].apply(lambda g: f"{int(g):,}")
+out = out.reset_index(drop=True)
+out.index += 1
+out.style.format({"KDA": "{:.2f}", "K": "{:.1f}", "D": "{:.1f}", "A": "{:.1f}"})
+```
+
+---
+
+## ⚡ PRO Esports
+
+```{python}
+#| echo: false
+team = "PRO Esports"
+rec  = team_record[team_record["team_clean"] == team].iloc[0]
+print(f"Record: {rec['win_games']}W – {rec['losses']}L  |  Win Rate: {rec['win_rate']}%")
+```
+
+::: {.team-card style="border-left: 5px solid #d97706; background: #fffbeb; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;"}
+**PRO Esports** had the ingredients for a competitive roster — **Naja** and **Boyet** produced strong individual stats — but struggled to convert performances into consistent wins. Their 36% win rate placed them near the bottom of the standings, suggesting coordination and macro-game execution as areas for development.
+:::
+
+```{python}
+#| echo: false
+t = player_summary[player_summary["team_clean"] == "PRO Esports"].sort_values("games", ascending=False)
+out = t[["Players","role","fav_hero","games","avg_kda","avg_k","avg_d","avg_a","avg_gold","mvp_total","hero_pool"]].copy()
+out.columns = ["Player","Role","Signature Hero","Games","KDA","K","D","A","Avg Gold","MVPs","Hero Pool"]
+out["Role"] = out["Role"].apply(lambda r: f"{role_icon(r)} {r}")
+out["KDA Badge"] = out["KDA"].apply(kda_badge)
+out["Avg Gold"] = out["Avg Gold"].apply(lambda g: f"{int(g):,}")
+out = out.reset_index(drop=True)
+out.index += 1
+out.style.format({"KDA": "{:.2f}", "K": "{:.1f}", "D": "{:.1f}", "A": "{:.1f}"})
+```
+
+---
+
+## 💜 Team Max
+
+```{python}
+#| echo: false
+team = "Team Max"
+rec  = team_record[team_record["team_clean"] == team].iloc[0]
+print(f"Record: {rec['win_games']}W – {rec['losses']}L  |  Win Rate: {rec['win_rate']}%")
+```
+
+::: {.team-card style="border-left: 5px solid #7c3aed; background: #f5f3ff; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;"}
+**Team Max** ran a tight five-man rotation throughout the season with no substitutions. **MasterBiiMo** was the team's primary shot-caller and playmaker from the mid lane, posting the highest KDA on the roster. **Layy** and **Flick** provided the team's carry firepower, with each securing multiple MVPs across the regular season.
+:::
+
+```{python}
+#| echo: false
+t = player_summary[player_summary["team_clean"] == "Team Max"].sort_values("games", ascending=False)
+out = t[["Players","role","fav_hero","games","avg_kda","avg_k","avg_d","avg_a","avg_gold","mvp_total","hero_pool"]].copy()
+out.columns = ["Player","Role","Signature Hero","Games","KDA","K","D","A","Avg Gold","MVPs","Hero Pool"]
+out["Role"] = out["Role"].apply(lambda r: f"{role_icon(r)} {r}")
+out["KDA Badge"] = out["KDA"].apply(kda_badge)
+out["Avg Gold"] = out["Avg Gold"].apply(lambda g: f"{int(g):,}")
+out = out.reset_index(drop=True)
+out.index += 1
+out.style.format({"KDA": "{:.2f}", "K": "{:.1f}", "D": "{:.1f}", "A": "{:.1f}"})
+```
+
+---
+
+## 🌟 Team SV
+
+```{python}
+#| echo: false
+team = "Team SV"
+rec  = team_record[team_record["team_clean"] == team].iloc[0]
+print(f"Record: {rec['win_games']}W – {rec['losses']}L  |  Win Rate: {rec['win_rate']}%")
+```
+
+::: {.team-card style="border-left: 5px solid #ea580c; background: #fff7ed; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;"}
+**Team SV** had the largest squad rotation of any team — nine different players saw game time. While this flexibility allowed them to test line-ups, it also meant less team cohesion. **Krayyy** stood out as the team's brightest talent with a 5.71 KDA and 2 MVPs, while **Rapidoot** provided veteran roam support across the widest hero pool on the roster (11 heroes).
+:::
+
+```{python}
+#| echo: false
+t = player_summary[player_summary["team_clean"] == "Team SV"].sort_values("games", ascending=False)
+out = t[["Players","role","fav_hero","games","avg_kda","avg_k","avg_d","avg_a","avg_gold","mvp_total","hero_pool"]].copy()
+out.columns = ["Player","Role","Signature Hero","Games","KDA","K","D","A","Avg Gold","MVPs","Hero Pool"]
+out["Role"] = out["Role"].apply(lambda r: f"{role_icon(r)} {r}")
+out["KDA Badge"] = out["KDA"].apply(kda_badge)
+out["Avg Gold"] = out["Avg Gold"].apply(lambda g: f"{int(g):,}")
+out = out.reset_index(drop=True)
+out.index += 1
+out.style.format({"KDA": "{:.2f}", "K": "{:.1f}", "D": "{:.1f}", "A": "{:.1f}"})
+```
+
+---
+
+## All-Teams Roster Overview
+
+```{python}
+#| label: fig-team-roster-kda
+#| fig-cap: "Average KDA for every player, grouped by team. Colour indicates team."
+
+# Only players with ≥ 5 games
+elig = player_summary[player_summary["games"] >= 5].copy()
+elig = elig.sort_values(["team_clean", "avg_kda"], ascending=[True, False])
+
+fig, ax = plt.subplots(figsize=(14, 6))
+
+x_pos   = 0
+x_ticks = []
+x_labels= []
+team_spans = {}
+
+for team, grp in elig.groupby("team_clean", sort=True):
+    color = utils.TEAM_COLORS.get(team, utils.PALETTE["muted"])
+    start = x_pos
+    for _, row in grp.iterrows():
+        ax.bar(x_pos, row["avg_kda"], color=color, edgecolor="white",
+               linewidth=0.8, width=0.7, alpha=0.88)
+        ax.text(x_pos, row["avg_kda"] + 0.08, f"{row['avg_kda']:.1f}",
+                ha="center", va="bottom", fontsize=7.5,
+                color=utils.PALETTE["text"], fontweight="600")
+        x_ticks.append(x_pos)
+        x_labels.append(row["Players"])
+        x_pos += 1
+    # shaded team region
+    ax.axvspan(start - 0.4, x_pos - 0.6, alpha=0.04, color=color)
+    team_spans[team] = (start, x_pos - 1)
+    x_pos += 0.8  # gap between teams
+
+ax.set_xticks(x_ticks)
+ax.set_xticklabels(x_labels, rotation=45, ha="right", fontsize=8)
+ax.set_ylabel("Average KDA")
+ax.set_title("Player KDA by Team — MPL Cambodia Season 6  (min. 5 games)", pad=12)
+
+# Team name labels on top
+for team, (s, e) in team_spans.items():
+    mid = (s + e) / 2
+    color = utils.TEAM_COLORS.get(team, utils.PALETTE["muted"])
+    ax.text(mid, ax.get_ylim()[1] * 0.97, team,
+            ha="center", va="top", fontsize=7.5,
+            color=color, fontweight="700")
+
+# Legend patches
+handles = [mpatches.Patch(color=utils.TEAM_COLORS.get(t, utils.PALETTE["muted"]), label=t)
+           for t in sorted(elig["team_clean"].unique())]
+ax.legend(handles=handles, fontsize=7.5, loc="upper right",
+          ncol=2, framealpha=0.6, edgecolor=utils.PALETTE["border"])
+
+fig.tight_layout()
+plt.show()
+```
+
+```{python}
+#| label: fig-team-hero-pool
+#| fig-cap: "Hero pool size (unique heroes played) per player. Wider pools indicate greater draft flexibility."
+
+fig, ax = plt.subplots(figsize=(14, 5))
+
+x_pos   = 0
+x_ticks = []
+x_labels= []
+
+for team, grp in elig.sort_values(["team_clean","hero_pool"],
+                                   ascending=[True,False]).groupby("team_clean", sort=True):
+    color = utils.TEAM_COLORS.get(team, utils.PALETTE["muted"])
+    start = x_pos
+    for _, row in grp.iterrows():
+        ax.bar(x_pos, row["hero_pool"], color=color, edgecolor="white",
+               linewidth=0.8, width=0.7, alpha=0.88)
+        ax.text(x_pos, row["hero_pool"] + 0.15, str(int(row["hero_pool"])),
+                ha="center", va="bottom", fontsize=8,
+                color=utils.PALETTE["text"], fontweight="600")
+        x_ticks.append(x_pos)
+        x_labels.append(row["Players"])
+        x_pos += 1
+    ax.axvspan(start - 0.4, x_pos - 0.6, alpha=0.04, color=color)
+    x_pos += 0.8
+
+ax.set_xticks(x_ticks)
+ax.set_xticklabels(x_labels, rotation=45, ha="right", fontsize=8)
+ax.set_ylabel("Unique Heroes Played")
+ax.set_title("Hero Pool Depth by Player  (min. 5 games)", pad=12)
+
+handles = [mpatches.Patch(color=utils.TEAM_COLORS.get(t, utils.PALETTE["muted"]), label=t)
+           for t in sorted(elig["team_clean"].unique())]
+ax.legend(handles=handles, fontsize=7.5, loc="upper right",
+          ncol=2, framealpha=0.6, edgecolor=utils.PALETTE["border"])
+
+fig.tight_layout()
+plt.show()
+```
+
+::: {.insight-box}
+**Takeaway:** DRoar Legends and Duck Rice Esport fielded the widest hero pools, giving them significant draft adaptability. CFU Gaming's tighter pools reflect a system-oriented approach — mastering a smaller champion set rather than spreading thin. Hero pool depth correlates loosely with team win rate, but elite execution on a core set can outperform wide-but-shallow versatility.
+:::
