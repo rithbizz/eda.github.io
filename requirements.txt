@@ -5,3 +5,4 @@ seaborn
 scipy
 ipykernel
 jinja2
+pyyaml

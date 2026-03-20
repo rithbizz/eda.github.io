@@ -32,7 +32,7 @@ jobs:
         run: |
           pip install \
             pandas numpy matplotlib seaborn scipy \
-            ipykernel jinja2
+            ipykernel jinja2 pyyaml
 
       - name: Register Jupyter kernel
         run: python -m ipykernel install --user
