@@ -32,7 +32,8 @@ jobs:
         run: |
           pip install \
             pandas numpy matplotlib seaborn scipy \
-            ipykernel jinja2 pyyaml
+            ipykernel jinja2 pyyaml \
+            nbformat nbclient nbconvert
 
       - name: Register Jupyter kernel
         run: python -m ipykernel install --user

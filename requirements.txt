@@ -6,3 +6,6 @@ scipy
 ipykernel
 jinja2
 pyyaml
+nbformat
+nbclient
+nbconvert
